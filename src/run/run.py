@@ -94,7 +94,7 @@ def run_sequential(args, logger):
     args.n_actions = env_info["n_actions"] # 动作空间
     args.state_shape = env_info["state_shape"] # 状态空间 默认为6
     args.accumulated_episodes = getattr(args, "accumulated_episodes", None)
-        
+
     # if getattr(args, 'agent_own_state_size', False):
     #     args.agent_own_state_size = get_agent_own_state_size(args.env_args)
 
@@ -234,7 +234,7 @@ def run_sequential(args, logger):
             learner.save_models(save_path)
 
         episode += args.batch_size_run
-        
+
         if (runner.t_env - last_log_T) >= args.log_interval:
             logger.log_stat("episode", episode, runner.t_env)
             logger.print_recent_stats()

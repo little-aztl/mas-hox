@@ -1,0 +1,37 @@
+{
+    // 给你的开发环境起个名字，会显示在VS Code左下角
+	"name": "MarlMini (in Docker)",
+
+	// -------------------- 关键配置 --------------------
+	// 直接指定你本地已有的镜像名称和标签
+	// 请将 "your-image-name:latest" 替换为 `docker images` 命令中看到的实际名称
+	"image": "tencentailab/marl-mini:20240607",
+    // ----------------------------------------------------
+
+
+	// 定义VS Code在容器中的行为
+	"customizations": {
+		"vscode": {
+			// 告诉VS Code在容器中自动安装这些扩展
+			"extensions": [
+				"ms-python.python",         // Python 核心支持
+				"ms-python.vscode-pylance"  // 智能提示和代码分析
+			]
+		}
+	},
+
+	// --- 以下是推荐配置，对于非官方Dev Container镜像尤其重要 ---
+
+	// 指定容器启动后，VS Code打开的工作区文件夹路径
+	// 建议保持 /workspaces/ 开头，后面跟你的项目名
+	"workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+
+	// 将你本地的项目文件夹挂载到容器的指定路径
+	// 这行代码的作用是：将本地项目文件夹的内容 挂载到 上面 "workspaceFolder" 定义的路径
+	"workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind,consistency=cached",
+
+	// (可选但推荐) 容器创建好之后，自动执行的命令。
+	// 比如，如果你的镜像里没有预先装好依赖，可以在这里自动安装。
+	// 如果你的项目有 requirements.txt 文件，取消下面的注释
+	// "postCreateCommand": "pip install -r requirements.txt"
+}

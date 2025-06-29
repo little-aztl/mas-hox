@@ -10,7 +10,7 @@ import numpy as np
 class NMAC(BasicMAC):
     def __init__(self, scheme, groups, args):
         super(NMAC, self).__init__(scheme, groups, args)
-        
+
     def select_actions(self, ep_batch, t_ep, t_env, bs=slice(None), test_mode=False):
         # Only select actions for the selected batch elements in bs
         avail_actions = ep_batch["avail_actions"][:, t_ep]
@@ -21,9 +21,9 @@ class NMAC(BasicMAC):
     def forward(self, ep_batch, t, test_mode=False):
         if test_mode:
             self.agent.eval()
-            
+
         agent_inputs = self._build_inputs(ep_batch, t)
-        avail_actions = ep_batch["avail_actions"][:, t]
+        # avail_actions = ep_batch["avail_actions"][:, t]
         agent_outs, self.hidden_states = self.agent(agent_inputs, self.hidden_states)
 
         return agent_outs

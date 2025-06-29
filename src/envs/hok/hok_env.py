@@ -56,14 +56,14 @@ class HokEnv(MultiAgentEnv, NatureClient):
         self.n_actions = self.action_space
 
         # self.agents = {}
-        # self.enemies = {}   
+        # self.enemies = {}
 
         self.monster_hp_total = [] # 存储当前episode的暴龙血量,直至最后一个step
         self.obs = None
         self.state = None
 
         self.pos_delta = 1500
-        
+
         self.SKILL_TYPE = ["obj_skill", "dir_skill", "pos_skill", "talent_skill"] # 动作施展方式
 
         # 用于输出结果,胜率
@@ -103,16 +103,16 @@ class HokEnv(MultiAgentEnv, NatureClient):
         all_actor_legal_skill = []
         for hero in self.heroes:
             if hero.actor_id == 6: # 暴龙直接退出
-                break 
+                break
             hero_legal_skill = [1,1,1,1]
             # hero就是当前的英雄,只选取合法的技能
             cur_legal_skill = [1 if slot.cooldown==0 else 0 for slot in hero.skill_state.slot_states]
             hero_legal_skill.extend(cur_legal_skill)
             hero_legal_skill.extend([1,1,1,1])
             all_actor_legal_skill.append(hero_legal_skill)
-        
+
         return all_actor_legal_skill
-    
+
     def get_avail_agent_actions(self, agent_id):
         """Returns the available actions for agent_id."""
         return self.get_avail_actions()[agent_id]
@@ -120,16 +120,16 @@ class HokEnv(MultiAgentEnv, NatureClient):
     def get_total_actions(self):
         """Returns the total number of actions an agent could ever take"""
         return self.action_space
-        
+
     def reset(self, if_test=False, args=None, cur_time=None):
         """Reset the environment. Required after each full episode.
-           Returns initial observations and states. 
+           Returns initial observations and states.
            Starting game in every episode phase of sampling
         """
         # self.battles_won = 0
         # self.battles_game = 0
 
-        self.monster_hp_total = [] 
+        self.monster_hp_total = []
 
         self._episode_steps = 0
         self.info_re = {'win_rate': 0., 'test_win_rate': 0., 'battle_won': None, 'monster_last_hp': None}
@@ -151,7 +151,7 @@ class HokEnv(MultiAgentEnv, NatureClient):
             - 然后, 进入一个主循环,直到游戏结束. 在每次循环中, 函数会调用 on_update 方法来更新游戏状态.\n
             - 当游戏结束时, 函数会输出一些统计信息, 并调用stop_game方法停止游戏.
         '''
-        
+
         t = time.time()
         ret = self.controller.start_game()
         if not ret:
@@ -187,7 +187,7 @@ class HokEnv(MultiAgentEnv, NatureClient):
             self.rsp = FightOverRsp()
             gameover_state = self.message_proto.gameover_state
             self.game_over = True
-            
+
             # 通过 game core 返回的状态码来判断游戏结束的状态
             if gameover_state == 1:
                 self.game_status = NC_CONFIG["game_status"]["win"]
@@ -196,10 +196,10 @@ class HokEnv(MultiAgentEnv, NatureClient):
             elif gameover_state == 4:
                 self.game_status = NC_CONFIG["game_status"]["error"]
             #self.send_response(self.rsp)
-        
+
         else:
             self.logger.warning("Warning: receiving message fails")
-            
+
         # 定义初始帧 state=(5, 6)的矩阵,5智能体,4为[x1,z1,agenthp,xm,zm,monsterhp]
         '''
             首帧获取信息,拿到gamecore返回的三个信息
@@ -213,19 +213,19 @@ class HokEnv(MultiAgentEnv, NatureClient):
         '''
 
         self.start_point = time.time()
-        
+
         # 大龙的血量要记录,用于计算reward
         self.monster_hp_total.append(self.monster_hp)
 
-        self.obs = self.agent_loc_np 
+        self.obs = self.agent_loc_np
         # normalize [0.1]
         # min_val = np.min(self.obs)
         # max_val = np.max(self.obs)
         # self.obs = (self.obs-min_val) / (max_val-min_val)
-        
+
         # normalize [-1.1]
-        self.obs = self.obs - np.mean(self.obs)
-        self.obs = self.obs / np.max(np.abs(self.obs))
+        # self.obs = self.obs - np.mean(self.obs)
+        # self.obs = self.obs / np.max(np.abs(self.obs))
 
         #print(f'self.obs {self.obs}')
 
@@ -238,8 +238,21 @@ class HokEnv(MultiAgentEnv, NatureClient):
             或者设一个列表存储整个episode的Monster HP 变化
             当前帧的奖励reward = (curr_monster_hp - last_monster_hp) * -0.01
         '''
-        
-        return (self.monster_hp_total[-1] - self.monster_hp_total[-2]) * -0.01
+        delta_hp = (self.monster_hp_total[-1] - self.monster_hp_total[-2]) * -0.01
+        distance = np.linalg.norm(self.obs[:, :2] - self.obs[:, 3:5], axis=1) # (5,)
+
+        direnjie_distance = np.copy(distance[1]) - 8000
+        direnjie_distance = np.clip(direnjie_distance, 0, np.inf)
+
+        distance = distance - 1000
+        distance = np.clip(distance, 0, np.inf)
+
+        distance[1] = direnjie_distance
+        distance_penalty = np.sum(distance) * 0.0001 # 计算距离惩罚,距离越近奖励越高
+        reward = delta_hp - distance_penalty
+        return reward
+
+
 
     def position_change(self, agent_id, act):
         '''用于计算偏移量即
@@ -272,43 +285,43 @@ class HokEnv(MultiAgentEnv, NatureClient):
             dst_pos.x = last_loc_x # 新的坐标是（x, z-10)
             dst_pos.z = last_loc_z - self.pos_delta
             dst_pos.y = 100
-        
+
         # """细化移动动作，左上、右上、右下、左下"""
         elif act==9:
             # 左上
             dst_pos.x = last_loc_x + self.pos_delta
             dst_pos.z = last_loc_z - self.pos_delta
             dst_pos.y = 100
-            
+
         elif act==10:
             # 右上
             dst_pos.x = last_loc_x + self.pos_delta
             dst_pos.z = last_loc_z + self.pos_delta
             dst_pos.y = 100
-            
+
         elif act==11:
             # 右下
             dst_pos.x = last_loc_x - self.pos_delta
             dst_pos.z = last_loc_z + self.pos_delta
             dst_pos.y = 100
-            
+
         elif act==12:
             # 左下
             dst_pos.x = last_loc_x - self.pos_delta
             dst_pos.z = last_loc_z - self.pos_delta
             dst_pos.y = 100
-            
+
         # 边界处理
         if dst_pos.x > 28700:
             dst_pos.x = 28700
         elif dst_pos.x < -28700:
             dst_pos.x = -28700
-        
+
         if dst_pos.z > 9000:
             dst_pos.z = 9000
         elif dst_pos.z < -16800:
             dst_pos.z = -16800
-        
+
         return dst_pos
 
     def get_skill_id_by_slot_type(self, hero, slot_type):
@@ -321,9 +334,9 @@ class HokEnv(MultiAgentEnv, NatureClient):
         dst_pos.x=random.randint(-28700,28700)
         dst_pos.y=100
         dst_pos.z=random.randint(-16800,9000)
-    
+
         return dst_pos
-    
+
     def get_angle(self, point_1=None, point_2=None):
         """通过两个坐标，计算point_2在point_1的哪个角度
         """
@@ -351,7 +364,7 @@ class HokEnv(MultiAgentEnv, NatureClient):
         cmd_pkg.obj_skill.CopyFrom(objSkill)
 
         return cmd_pkg
-    
+
     def __dir_skill_command(self, target, hero, skill_slot_type, angle=None):
         cmd_pkg = CmdPkg()
         skill = DirSkill()
@@ -361,7 +374,7 @@ class HokEnv(MultiAgentEnv, NatureClient):
         skill.degree = int(angle)
         cmd_pkg.command_type = CommandType.COMMAND_TYPE_DirSkill
         cmd_pkg.dir_skill.CopyFrom(skill)
-        
+
         return cmd_pkg
 
     def __pos_skill_command(self, hero, skill_slot_type):
@@ -372,7 +385,7 @@ class HokEnv(MultiAgentEnv, NatureClient):
         skill.slotType = skill_slot_type
         cmd_pkg.command_type = CommandType.COMMAND_TYPE_PosSkill
         cmd_pkg.pos_skill.CopyFrom(skill)
-        
+
         return cmd_pkg
 
     def __talent_skill_command(self, target):
@@ -382,11 +395,11 @@ class HokEnv(MultiAgentEnv, NatureClient):
         skill.actorID = target
         cmd_pkg.command_type = CommandType.COMMAND_TYPE_TalentSkill
         cmd_pkg.talent_skill.CopyFrom(skill)
-        
+
         return cmd_pkg
 
     def act_2_cmd(self, actions):
-        ''' 
+        '''
             actions应该是类似于 [2,3,1,4,1]的数值列表
             将动作转换为cmd指令,然后传入gamecore中
             [agent1_cmd, agent2_cmd, ... agent5_cmd]
@@ -400,15 +413,15 @@ class HokEnv(MultiAgentEnv, NatureClient):
             7: skill3
             8: skill4
             self.heroes: 包含了上一帧中所有英雄的信息,这里主要是基于上一帧用技能攻击暴龙
-            
+
             actions = [a1, a2, a3, a4, a5] 分别对应5个智能体
-            
+
             庄周:技能1(方向型), 技能2(自身释放型), 技能3(自身释放型)
             狄仁杰:技能1(方向型), 技能2(方向型), 技能3(方向型)
             貂蝉:技能1(方向型), 技能2(方向型), 技能3(自身释放型)
             孙悟空:技能1(自身释放型), 技能2(方向型), 技能3(自身释放型)
             曹操:技能1(方向型), 技能2(方向型), 技能3(自身释放型)
-            
+
         '''
         cmd_list, stop_game = [], False
         skill_type = None
@@ -425,13 +438,13 @@ class HokEnv(MultiAgentEnv, NatureClient):
                     target = 6
                 elif act == 6:
                     skill_type = 'obj_skill'
-                    target = _id+1  
+                    target = _id+1
                 elif act == 7:
                     skill_type = 'obj_skill'
-                    target = _id+1  
+                    target = _id+1
                 elif act == 8:
                     skill_type = 'talent_skill'
-                    target = _id+1  
+                    target = _id+1
             elif _id == 1:
                 """狄仁杰"""
                 if act == 4:
@@ -496,7 +509,7 @@ class HokEnv(MultiAgentEnv, NatureClient):
                 elif act == 8:
                     skill_type = 'talent_skill'
                     target = _id+1
-            
+
             hero = self.heroes[_id]
             # 计算暴龙此刻在英雄的哪个角度，通过两个坐标
             hero_x = self.agent_loc_np[_id][0]
@@ -516,7 +529,7 @@ class HokEnv(MultiAgentEnv, NatureClient):
                 attack.start = 1
                 cmd_pkg.command_type = CommandType.COMMAND_TYPE_AttackCommon
                 cmd_pkg.attack_common.CopyFrom(attack)
-            
+
             ## 加入4个英雄技能
             elif act == 5:
                 skill_slot_type = 1 # 1技能
@@ -550,10 +563,10 @@ class HokEnv(MultiAgentEnv, NatureClient):
                     cmd_pkg = self.__pos_skill_command(hero, skill_slot_type)
                 elif skill_type == "talent_skill":
                     cmd_pkg = self.__talent_skill_command(target)
-            
-            elif act == 8: 
+
+            elif act == 8:
                 cmd_pkg = self.__talent_skill_command(target)
-            
+
             else:
                 # 0上 1下 2左 3右
                 move_pos = MoveToPos()
@@ -586,13 +599,13 @@ class HokEnv(MultiAgentEnv, NatureClient):
         self.step_time_cost+=ti
         self.start_point = time.time()
         self.timestep+=1
-        
+
         # 每帧训练,先给对面动作,看对面反馈,因为reset()已经拿到初始信息了,现在做的动作相当于基于初始状态下做的动作
         if self.message_name == "FightStartReq":
             self.send_response(self.rsp)
 
         elif self.message_name == "StepFrameReq":
-            # get actions from agent 
+            # get actions from agent
             cmd_list, stop_game = self.act_2_cmd(actions) # 要重新编辑
 
             if stop_game:
@@ -601,7 +614,7 @@ class HokEnv(MultiAgentEnv, NatureClient):
                 self.rsp.gameover_ai_server = 1
                 self.controller.stop_game()
                 self.logger.info("Send game over request to game core")
-                
+
 
             # senf action cmd
             # send step frame response
@@ -626,7 +639,7 @@ class HokEnv(MultiAgentEnv, NatureClient):
             if (self._episode_steps >= self.episode_limit):
                 self.game_status = NC_CONFIG["game_status"]["overtime"]
 
-        # receive next step obs, and interact with the gamecore again 
+        # receive next step obs, and interact with the gamecore again
         if not self.game_over:
             #print('nextnextnext')
             # 更新时间
@@ -650,7 +663,7 @@ class HokEnv(MultiAgentEnv, NatureClient):
                 self.rsp = FightOverRsp()
                 gameover_state = self.message_proto.gameover_state
                 self.game_over = True
-                
+
                 # 通过 game core 返回的状态码来判断游戏结束的状态
                 if gameover_state == 1:
                     self.game_status = NC_CONFIG["game_status"]["win"]
@@ -660,17 +673,33 @@ class HokEnv(MultiAgentEnv, NatureClient):
                     self.game_status = NC_CONFIG["game_status"]["error"]
 
                 #self.send_response(self.rsp)
-        
+
 
             self.start_point = time.time()
 
             # 大龙的血量要记录,用于计算reward
             self.monster_hp_total.append(self.monster_hp)
-            
-            self.obs = self.agent_loc_np # 这是下一轮的obs, self.obs 赋予新一帧的观测
+
+            # self.obs = self.agent_loc_np # 这是下一轮的obs, self.obs 赋予新一帧的观测
+
             # normalize [-1,1]
-            self.obs = self.obs - np.mean(self.obs)
-            self.obs = self.obs / np.max(np.abs(self.obs))
+            # self.obs = self.obs - np.mean(self.obs)
+            # self.obs = self.obs / np.max(np.abs(self.obs))
+            # self.obs_location = self.agent_loc_np[:, [0, 1, 3, 4]] # (N, 4)
+            # self.obs_location = self.obs_location - np.mean(self.obs_location)
+            # self.obs_location = self.obs_location / np.max(np.abs(self.obs_location))
+
+            # self.agent_hp = self.agent_loc_np[:, [2]]
+            # self.agent_hp = self.agent_hp / 8000
+
+            # self.monster_hp = self.agent_loc_np[:, [5]]
+            # self.monster_hp = self.monster_hp / 30000
+
+            # self.obs = np.concatenate([self.obs_location[:, :2], self.agent_hp, self.obs_location[:, 2:], self.monster_hp], axis=1) # (N, 6)
+
+            # print(f"self.obs: {type(self.obs)} {self.obs}")
+            # input()
+            self.obs = self.agent_loc_np # 这是下一轮的obs, self.obs 赋予新一帧的观测
             reward = self.get_curr_reward()
             terminated = False
 
@@ -685,21 +714,21 @@ class HokEnv(MultiAgentEnv, NatureClient):
             self.logger.info("0: error, 1: win, 2: fail, 3: overtime")
             self.logger.info(
                 f"FrameNo = [{self.frame_no}], StepNo = [{self.timestep}], avg time = [{avg_time}]")
-            
+
             self.controller.stop_game()
-            
+
             # self.battles_game+=1
 
-            ## 记录结果:battle_won: 
+            ## 记录结果:battle_won:
             if self.game_status == 1:
                 #self.battles_won+=1
                 self.info_re['battle_won'] = True
 
             elif self.game_status == 2 or 3:
                 self.info_re['battle_won'] = False
-                
+
             self.info_re['monster_last_hp'] = self.monster_hp_total[-1]
-            
+
         return reward, terminated, self.info_re
 
     def save_replay(self):
@@ -722,7 +751,7 @@ class HokEnv(MultiAgentEnv, NatureClient):
                     "n_agents": self.n_agents, # 5
                     "episode_limit": self.episode_limit} # 这个episode_limit可能是buffer的存储时间长度？？
         return env_info
-    
+
     def get_stats(self):
         stats={
             # "battles_won": self.battles_won,
@@ -732,5 +761,5 @@ class HokEnv(MultiAgentEnv, NatureClient):
             #"timeouts": self.timeouts,
             #"restarts": self.force_restarts,
         }
-        
+
         return stats

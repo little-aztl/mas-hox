@@ -42,7 +42,7 @@ class BasicMAC:
                 agent_outs[reshaped_avail_actions == 0] = -1e5
 
             agent_outs = th.nn.functional.softmax(agent_outs, dim=-1)
-            
+
         return agent_outs.view(ep_batch.batch_size, self.n_agents, -1)
 
     def init_hidden(self, batch_size):
@@ -74,6 +74,8 @@ class BasicMAC:
         bs = batch.batch_size
         inputs = []
         inputs.append(batch["obs"][:, t])  # b1av
+        # print(batch["obs"][:, t])
+        # input()
         if self.args.obs_last_action:
             if t == 0:
                 inputs.append(th.zeros_like(batch["actions_onehot"][:, t]))

@@ -16,7 +16,7 @@ from run import REGISTRY as run_REGISTRY
 SETTINGS['CAPTURE_MODE'] = "fd" # set to "no" if you want to see stdout/stderr in console
 logger = get_logger()
 
-ex = Experiment("pymarl")
+ex = Experiment("pymarl", save_git_info=False)
 ex.logger = logger
 ex.captured_out_filter = apply_backspaces_and_linefeeds
 
@@ -30,7 +30,7 @@ def my_main(_run, _config, _log):
     np.random.seed(config["seed"])
     th.manual_seed(config["seed"])
     config['env_args']['seed'] = config["seed"]
-    
+
     # run
     if "use_per" in _config and _config["use_per"]:
         run_REGISTRY['per_run'](_run, config, _log)
@@ -103,11 +103,12 @@ if __name__ == '__main__':
 
     # Save to disk by default for sacred
     map_name = parse_command(params, "env_args.map_name", config_dict['env_args']['map_name'])
-    algo_name = parse_command(params, "name", config_dict['name']) 
+    algo_name = parse_command(params, "name", config_dict['name'])
     file_obs_path = join(results_path, "sacred", map_name, algo_name)
-    
+
     logger.info("Saving to FileStorageObserver in {}.".format(file_obs_path))
     ex.observers.append(FileStorageObserver.create(file_obs_path))
+    # ex.observers.append(MongoObserver(db_name='my_experiemnts_db'))
 
     ex.run_commandline(params)
 
