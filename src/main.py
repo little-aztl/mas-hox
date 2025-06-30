@@ -9,7 +9,7 @@ from sacred.utils import apply_backspaces_and_linefeeds
 import sys
 import torch as th
 from utils.logging import get_logger
-import yaml
+import yaml, time
 
 from run import REGISTRY as run_REGISTRY
 
@@ -27,6 +27,7 @@ results_path = join(dirname(dirname(abspath(__file__))), "results")
 def my_main(_run, _config, _log):
     # Setting the random seed throughout the modules
     config = config_copy(_config)
+    config['seed'] = int(time.time())
     np.random.seed(config["seed"])
     th.manual_seed(config["seed"])
     config['env_args']['seed'] = config["seed"]

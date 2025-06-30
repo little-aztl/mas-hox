@@ -11,17 +11,20 @@ def load_info(exp_number):
 
     return last_hp, timestamps
 
-exp_numbers = [38, 39, 40, 47]
+exp_numbers = [11, 38, 47]
 
 labels = [
-    # "Baseline",
+    "Baseline",
     "Mask Monst. HP + Rela. Pos",
-    "Rela. Pos",
-    "Mask Monst. HP",
+    # "Rela. Pos",
+    # "Mask Monst. HP",
     "Mask Monst. HP + Rela. Pos + Dist. Penalty",
 ]
 
 if __name__ == "__main__":
+
+    plt.figure(figsize=(12, 6))
+
     for exp_number, label in zip(exp_numbers, labels):
         last_hp, timestamps = load_info(exp_number)
         plt.plot(timestamps, last_hp, label=label)
